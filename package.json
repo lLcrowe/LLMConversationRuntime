@@ -1,0 +1,18 @@
+{
+  "name": "com.llcrowe.llm-conversation-runtime",
+  "version": "0.1.0",
+  "displayName": "lLcrowe LLM Conversation Runtime",
+  "description": "Provider-neutral conversation sessions for LLM, human, and system participants.",
+  "unity": "6000.3",
+  "author": {
+    "name": "lLcrowe"
+  },
+  "keywords": [
+    "llm",
+    "conversation",
+    "agent",
+    "runtime",
+    "roleplay"
+  ]
+}
+

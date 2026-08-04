@@ -1,0 +1,15 @@
+{
+  "name": "lLcrowe.LLMConversation.Runtime",
+  "rootNamespace": "lLCroweTool.LLMConversation",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
+
