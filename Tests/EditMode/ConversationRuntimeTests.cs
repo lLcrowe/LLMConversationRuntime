@@ -308,6 +308,32 @@ namespace lLCroweTool.LLMConversation.Tests
             Assert.AreEqual(1, debug.RetryCount);
         }
 
+        [Test]
+        public void ExperimentRecord_GroupsAcceptedTurnsByModelReference()
+        {
+            ConversationRuntime runtime = CreateRuntime();
+            List<ConversationParticipant> participantList = CreateParticipants(2);
+            participantList[0].PersonaReference = "terra";
+            participantList[1].PersonaReference = "gemma-4";
+            ConversationSnapshot snapshot = runtime.CreateSession(participantList);
+            runtime.SubmitAction(ConversationAction.Speak(
+                snapshot.SessionId, participantList[0].ParticipantId, "첫 제안"));
+            runtime.SubmitAction(ConversationAction.Speak(
+                snapshot.SessionId, participantList[1].ParticipantId, "두 번째 제안"));
+
+            ConversationExperimentRecord record = ConversationExperimentEvaluator.Create(
+                runtime.GetSnapshot(snapshot.SessionId),
+                "merchant-bargain",
+                "상인·손님 흥정",
+                null);
+
+            Assert.AreEqual(2, record.ModelMetricList.Count);
+            Assert.AreEqual("terra", record.ModelMetricList[0].ModelId);
+            Assert.AreEqual(1, record.ModelMetricList[0].TurnCount);
+            Assert.AreEqual("gemma-4", record.ModelMetricList[1].ModelId);
+            Assert.AreEqual(1, record.ModelMetricList[1].TurnCount);
+        }
+
         private static ConversationRuntime CreateRuntime()
         {
             long now = 1000;

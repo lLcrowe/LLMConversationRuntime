@@ -17,6 +17,7 @@ ConversationRuntime
 ├─ Session·Participant
 ├─ SceneContract projection
 ├─ turn·recipient·lifecycle validation
+├─ quality·experiment evaluation
 └─ Event·Snapshot
         ↓
 Consumer authority
@@ -32,6 +33,7 @@ Core는 Provider 호출, MCP transport, 게임 상태를 참조하지 않습니�
 - LLM 응답만으로 지갑·인벤토리·퀘스트·세계 상태를 변경하지 않습니다.
 - StoryLLMMaster·FateWeaver·특정 LLM SDK를 Core에서 참조하지 않습니다.
 - 첫 버전은 메모리 세션과 스냅샷을 소유하며 영속 저장소는 소비 Adapter 뒤로 미룹니다.
+- 동일 조건 모델 비교 결과는 `ConversationExperimentEvaluator`가 생성하고, 확정 실험 결과의 영속 기록은 소비자의 αα Tracker·Plan이 소유합니다.
 - 자유 텍스트의 의미를 Core가 추측해 게임 명령으로 실행하지 않습니다.
 
 ## 소비 구조

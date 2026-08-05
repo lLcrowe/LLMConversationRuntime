@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — 2026-08-05
+
+- `ConversationExperimentEvaluator`를 추가했습니다.
+- 같은 장면·정책으로 실행한 모델별 발화 수, 품질 재생성, 반복, 역할 이탈, 메타 누출을 공급자 중립 비교 기록으로 집계합니다.
+- 결과 영속 저장은 Core가 아니라 Tracker·Plan 또는 소비자 보고 계층이 소유합니다.
+
 ## 0.1.1 — 2026-08-05
 
 - `Runtime/Quality/ConversationQualityEvaluator`를 추가했습니다.
