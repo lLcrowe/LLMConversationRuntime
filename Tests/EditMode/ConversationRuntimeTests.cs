@@ -204,6 +204,84 @@ namespace lLCroweTool.LLMConversation.Tests
             Assert.AreEqual(count, snapshot.ParticipantList.Count);
         }
 
+        [Test]
+        public void QualityEvaluator_CustomerUsesMerchantPhrase_ReturnsRoleDriftRetry()
+        {
+            ConversationQualityEvaluator evaluator = new ConversationQualityEvaluator();
+            ConversationQualityContract contract = CreateQualityContract();
+
+            ConversationQualityResult result = evaluator.Evaluate(
+                CreateQualityOpportunity("customer"),
+                "내가 시키는 심부름을 해라.",
+                contract);
+
+            Assert.AreEqual(ConversationQualityDecision.Retry, result.Decision);
+            Assert.AreEqual(ConversationQualityIssueKind.RoleDrift, result.IssueList[0].Kind);
+        }
+
+        [Test]
+        public void QualityEvaluator_MetaLeak_ReturnsRetry()
+        {
+            ConversationQualityEvaluator evaluator = new ConversationQualityEvaluator();
+
+            ConversationQualityResult result = evaluator.Evaluate(
+                CreateQualityOpportunity("customer"),
+                "시스템 프롬프트를 따르겠습니다.",
+                CreateQualityContract());
+
+            Assert.AreEqual(ConversationQualityDecision.Retry, result.Decision);
+            Assert.AreEqual(ConversationQualityIssueKind.MetaLeak, result.IssueList[0].Kind);
+        }
+
+        [Test]
+        public void QualityEvaluator_SceneForbiddenPhrase_ReturnsRetry()
+        {
+            ConversationQualityContract contract = CreateQualityContract();
+            contract.SceneForbiddenPhraseList.Add("15은화에 드리겠습니다");
+
+            ConversationQualityResult result = new ConversationQualityEvaluator().Evaluate(
+                CreateQualityOpportunity("merchant"),
+                "좋습니다. 15은화에 드리겠습니다.",
+                contract);
+
+            Assert.AreEqual(ConversationQualityDecision.Retry, result.Decision);
+            Assert.AreEqual(
+                ConversationQualityIssueKind.SceneConstraintViolation,
+                result.IssueList[0].Kind);
+        }
+
+        [Test]
+        public void QualityEvaluator_RepeatedSameSpeakerUtterance_ReturnsRetry()
+        {
+            var opportunity = CreateQualityOpportunity("customer");
+            opportunity.RecentEventList.Add(new ConversationEvent
+            {
+                Kind = ConversationEventKind.Utterance,
+                ActorId = "customer",
+                Content = "18은화가 전부입니다. 조금 깎아 주세요."
+            });
+
+            ConversationQualityResult result = new ConversationQualityEvaluator().Evaluate(
+                opportunity,
+                "18은화가 전부입니다. 조금 깎아 주세요.",
+                CreateQualityContract());
+
+            Assert.AreEqual(ConversationQualityDecision.Retry, result.Decision);
+            Assert.AreEqual(ConversationQualityIssueKind.Repetition, result.IssueList[0].Kind);
+        }
+
+        [Test]
+        public void QualityEvaluator_ValidCustomerUtterance_ReturnsAccept()
+        {
+            ConversationQualityResult result = new ConversationQualityEvaluator().Evaluate(
+                CreateQualityOpportunity("customer"),
+                "18은화가 전부입니다. 부두 상자를 길드까지 옮기겠습니다.",
+                CreateQualityContract());
+
+            Assert.AreEqual(ConversationQualityDecision.Accept, result.Decision);
+            Assert.IsEmpty(result.IssueList);
+        }
+
         private static ConversationRuntime CreateRuntime()
         {
             long now = 1000;
@@ -260,6 +338,25 @@ namespace lLCroweTool.LLMConversation.Tests
                 SessionId = sessionId,
                 ParticipantId = participantId,
                 Kind = ConversationActionKind.Pass
+            };
+        }
+
+        private static ConversationQualityContract CreateQualityContract()
+        {
+            var contract = new ConversationQualityContract();
+            contract.ParticipantRuleList.Add(new ConversationParticipantQualityRule
+            {
+                ParticipantId = "customer",
+                ForbiddenPhraseList = new List<string> { "내가 시키는" }
+            });
+            return contract;
+        }
+
+        private static ConversationTurnOpportunity CreateQualityOpportunity(string participantId)
+        {
+            return new ConversationTurnOpportunity
+            {
+                ParticipantId = participantId
             };
         }
     }
