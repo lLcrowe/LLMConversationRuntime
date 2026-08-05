@@ -282,6 +282,32 @@ namespace lLCroweTool.LLMConversation.Tests
             Assert.IsEmpty(result.IssueList);
         }
 
+        [Test]
+        public void TurnContentProjection_SeparatesPlayerMindReadingAndDebugFields()
+        {
+            var content = new ConversationTurnContent
+            {
+                SpokenText = "먹을거 없나.",
+                InnerMonologueText = "아… 배고프다.",
+                ActionProposal = "FindFood",
+                RetryCount = 1
+            };
+
+            ConversationTurnContentView player = ConversationTurnContentProjection.Project(
+                content, ConversationContentVisibility.Player);
+            ConversationTurnContentView mind = ConversationTurnContentProjection.Project(
+                content, ConversationContentVisibility.MindReading);
+            ConversationTurnContentView debug = ConversationTurnContentProjection.Project(
+                content, ConversationContentVisibility.Debug);
+
+            Assert.IsNull(player.InnerMonologueText);
+            Assert.IsNull(player.ActionProposal);
+            Assert.AreEqual("아… 배고프다.", mind.InnerMonologueText);
+            Assert.IsNull(mind.ActionProposal);
+            Assert.AreEqual("FindFood", debug.ActionProposal);
+            Assert.AreEqual(1, debug.RetryCount);
+        }
+
         private static ConversationRuntime CreateRuntime()
         {
             long now = 1000;
