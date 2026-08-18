@@ -1,9 +1,13 @@
 {
   "name": "com.llcrowe.llm-conversation-runtime",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "displayName": "lLcrowe LLM Conversation Runtime",
   "description": "Provider-neutral conversation sessions for LLM, human, and system participants.",
   "unity": "6000.3",
+  "license": "MIT",
+  "documentationUrl": "https://github.com/lLcrowe/LLMConversationRuntime#readme",
+  "changelogUrl": "https://github.com/lLcrowe/LLMConversationRuntime/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/lLcrowe/LLMConversationRuntime/blob/main/LICENSE",
   "author": {
     "name": "lLcrowe"
   },
@@ -13,5 +17,12 @@
     "agent",
     "runtime",
     "roleplay"
+  ],
+  "samples": [
+    {
+      "displayName": "Six Participant Negotiation",
+      "description": "A deterministic six-participant negotiation setup and turn-submission example.",
+      "path": "Samples~/SixParticipantNegotiation"
+    }
   ]
 }

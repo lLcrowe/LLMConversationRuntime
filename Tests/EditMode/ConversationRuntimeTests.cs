@@ -46,6 +46,28 @@ namespace lLCroweTool.LLMConversation.Tests
         }
 
         [Test]
+        public void SubmitAction_UndefinedActionKind_IsRejectedWithoutAdvancing()
+        {
+            ConversationRuntime runtime = CreateRuntime();
+            List<ConversationParticipant> participantList = CreateParticipants(2);
+            ConversationSnapshot snapshot = runtime.CreateSession(participantList);
+            var action = new ConversationAction
+            {
+                ActionId = "invalid-kind",
+                SessionId = snapshot.SessionId,
+                ParticipantId = participantList[0].ParticipantId,
+                Kind = (ConversationActionKind)999
+            };
+
+            ConversationOperationResult result = runtime.SubmitAction(action);
+
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual("invalid_action_kind", result.Code);
+            Assert.AreEqual(ConversationState.Active, result.Snapshot.State);
+            Assert.AreEqual(0, result.Snapshot.TurnCount);
+        }
+
+        [Test]
         public void SubmitAction_DuplicateActionId_ReturnsExistingEventOnce()
         {
             ConversationRuntime runtime = CreateRuntime();

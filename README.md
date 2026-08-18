@@ -1,58 +1,128 @@
 # LLMConversationRuntime
 
-여러 LLM·사람·시스템 참여자가 같은 세션에서 자율 또는 장면 지향 대화를 나누도록 조율하는 공급자 중립 Unity Package Manager(UPM) 런타임입니다.
+[한국어 README](README.ko.md)
 
-## 설계 계약
-
-### Intent
-
-Codex·Claude·LM Studio 같은 서로 다른 공급자와 플레이어가 사람의 복사·붙여넣기 없이 발화·침묵·호출·퇴장·종료를 주고받게 합니다. 독립 실험 프로젝트에서는 대화 품질과 한계를 관찰하고, 게임 프로젝트에서는 허용된 장면 문맥만 전달하는 역할놀이 코어로 사용합니다.
-
-### Architecture
+A provider-neutral Unity Package Manager (UPM) runtime for deterministic conversations between LLM, human, and system participants.
 
 ```text
-Provider·Human UI·System event
-        ↓ ParticipantAction
+Provider adapter / Human UI / System event
+                    ↓ ParticipantAction
 ConversationRuntime
-├─ Session·Participant
-├─ SceneContract projection
-├─ turn·recipient·lifecycle validation
-├─ quality·experiment evaluation
-└─ Event·Snapshot
-        ↓
-Consumer authority
-├─ LLMConversationLab visualization
-└─ StoryLLMMaster game validation
+├─ session and participant state
+├─ scene and private-context projection
+├─ turn, recipient, and lifecycle validation
+├─ quality and experiment evaluation
+└─ events and snapshots
+                    ↓
+Consumer-owned game authority and presentation
 ```
 
-Core는 Provider 호출, MCP transport, 게임 상태를 참조하지 않습니다. 소비 프로젝트가 현재 `TurnOpportunity`를 Provider 또는 사람 UI에 전달하고 반환된 `ParticipantAction`을 Runtime에 제출합니다.
+The package does not call an LLM API, host MCP transport, or mutate game state. Consumers supply actions and decide how accepted proposals affect their game.
 
-### 경계
+## Requirements
 
-- `GameRuntimeMcpHost`의 localhost·token·MCP stdio 책임을 복제하지 않습니다.
-- LLM 응답만으로 지갑·인벤토리·퀘스트·세계 상태를 변경하지 않습니다.
-- StoryLLMMaster·FateWeaver·특정 LLM SDK를 Core에서 참조하지 않습니다.
-- 첫 버전은 메모리 세션과 스냅샷을 소유하며 영속 저장소는 소비 Adapter 뒤로 미룹니다.
-- 동일 조건 모델 비교 결과는 `ConversationExperimentEvaluator`가 생성하고, 확정 실험 결과의 영속 기록은 소비자의 αα Tracker·Plan이 소유합니다.
-- 자유 텍스트의 의미를 Core가 추측해 게임 명령으로 실행하지 않습니다.
+- Unity 6000.3 or newer
+- No external runtime dependencies
 
-## 소비 구조
+## Install
+
+In Unity Package Manager, select **Add package from git URL** and enter a fixed release tag:
 
 ```text
-Modules/LLMConversationRuntime
-├─ Projects/LLMConversationLab
-└─ Projects/StoryLLMMaster
+https://github.com/lLcrowe/LLMConversationRuntime.git#v0.1.3
 ```
 
-## Python 원형과의 관계
+For local development, select **Add package from disk** and choose this repository's `package.json`.
 
-초기 Python 원형은 공급자 중립 대화 계약과 Runtime MCP 연결을 검증했습니다. 본 UPM이 Unity 런타임 정본이며, 원형의 회귀 사례는 UPM과 `LLMConversationLab` 테스트로 이관했습니다. 같은 대화 상태 머신을 두 곳에서 독립 확장하지 않습니다.
+## Quick start
 
-## Spec 판정
+```csharp
+using System.Collections.Generic;
+using lLCroweTool.LLMConversation;
 
-```text
-Spec 적용: 적용
-판정: SPEC-PASS
-근거 정본: README.md#설계-계약
-누락·회수 조건: 없음
+var runtime = new ConversationRuntime();
+var snapshot = runtime.CreateSession(
+    new List<ConversationParticipant>
+    {
+        new ConversationParticipant
+        {
+            ParticipantId = "buyer",
+            DisplayName = "Buyer",
+            Provider = "human",
+            Kind = ConversationParticipantKind.Human
+        },
+        new ConversationParticipant
+        {
+            ParticipantId = "seller",
+            DisplayName = "Seller",
+            Provider = "local-model",
+            Kind = ConversationParticipantKind.Llm
+        }
+    });
+
+ConversationTurnOpportunity turn = runtime.GetTurnOpportunity(snapshot.SessionId);
+ConversationAction action = ConversationAction.Speak(
+    snapshot.SessionId,
+    turn.ParticipantId,
+    "I would like to discuss the delivery terms.");
+ConversationOperationResult result = runtime.SubmitAction(action);
 ```
+
+The provider or player UI reads the current `ConversationTurnOpportunity`, creates a `ConversationAction`, and submits it. Repeat until the returned snapshot is completed.
+
+## Core API
+
+| API | Responsibility |
+|---|---|
+| `ConversationRuntime.CreateSession` | Validate participants and create an autonomous or scene-guided session |
+| `GetTurnOpportunity` | Project the current speaker, recent events, and allowed private scene context |
+| `SubmitAction` | Validate and record speak, pass, leave, participant-request, or stop actions |
+| `Pause`, `Resume`, `Stop` | Control the session lifecycle |
+| `ConversationQualityEvaluator` | Detect configured role drift, scene violations, meta leakage, and repetition |
+| `ConversationExperimentEvaluator` | Aggregate provider-neutral model metrics from a completed snapshot |
+| `ConversationTurnContentProjection` | Limit spoken, inner-monologue, proposal, and debug data by visibility |
+
+See [Documentation~/index.md](Documentation~/index.md) for the integration flow and authority boundary.
+
+## Scene-guided conversations
+
+`ConversationMode.SceneGuided` requires a `ConversationSceneContract`. The turn opportunity exposes public context to every participant and only the current participant's matching private context.
+
+The runtime never interprets free text as an executable game command. Validate `ConversationTurnContent.ActionProposal` in a game-owned adapter before changing authoritative state.
+
+## Sample
+
+Import **Six Participant Negotiation** from Package Manager. Add `SixParticipantNegotiationExample` to a GameObject, enter Play Mode, and invoke **Advance Negotiation** from the component context menu to submit deterministic sample turns.
+
+## Testing
+
+Open **Window > General > Test Runner**, select Edit Mode, and run `lLcrowe.LLMConversation.Tests.EditMode`.
+
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Package Manager cannot install the URL | Use the full Git URL with an existing `v0.1.3` tag and Unity 6000.3 or newer. |
+| `CreateSession` throws | Supply at least two participants with unique IDs, unique display names, and non-empty providers. |
+| `GetTurnOpportunity` returns `null` | The session is paused or completed. Inspect `GetSnapshot(sessionId).State`. |
+| `SubmitAction` returns `out_of_turn` | Use the `ParticipantId` from the latest turn opportunity. |
+| Scene-guided creation throws | Supply a non-null `ConversationSceneContract`. |
+| Private context is missing | Add a `ParticipantPrivateContext` whose `ParticipantId` exactly matches the current participant. |
+
+## Scope and limitations
+
+- Included: in-memory sessions, turn scheduling, recipient validation, snapshots, structured content projection, quality checks, and experiment metrics.
+- Excluded: provider SDKs, prompt construction, MCP transport, persistence, moderation policy, and authoritative game-state mutation.
+- Threading: call the current runtime API from one owner thread; concurrent mutation is not supported.
+
+## Related project
+
+[GameRuntimeMcpHost](https://github.com/lLcrowe/GameRuntimeMcpHost) can expose a game-owned conversation adapter to MCP clients without adding transport concerns to this package.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Report security issues according to [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

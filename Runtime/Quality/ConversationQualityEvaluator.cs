@@ -3,34 +3,50 @@ using System.Collections.Generic;
 
 namespace lLCroweTool.LLMConversation
 {
+    /// <summary>Defines the consumer action recommended by a quality evaluation.</summary>
     public enum ConversationQualityDecision
     {
+        /// <summary>The content passed every configured check.</summary>
         Accept,
+        /// <summary>The content has recoverable issues and may be regenerated.</summary>
         Retry,
+        /// <summary>The content cannot be accepted as submitted.</summary>
         Reject
     }
 
+    /// <summary>Identifies a category of detected conversation-quality issue.</summary>
     public enum ConversationQualityIssueKind
     {
+        /// <summary>The participant violated its configured role constraints.</summary>
         RoleDrift,
+        /// <summary>The content violated a scene-wide constraint.</summary>
         SceneConstraintViolation,
+        /// <summary>The content exposed prompt or system metadata.</summary>
         MetaLeak,
+        /// <summary>The participant repeated a recent utterance above the threshold.</summary>
         Repetition
     }
 
+    /// <summary>Defines forbidden phrases for one participant.</summary>
     [Serializable]
     public sealed class ConversationParticipantQualityRule
     {
+        /// <summary>Gets or sets the participant identifier governed by this rule.</summary>
         public string ParticipantId;
+        /// <summary>Gets the phrases that indicate role drift for this participant.</summary>
         public List<string> ForbiddenPhraseList = new List<string>();
     }
 
+    /// <summary>Defines deterministic checks applied to generated conversation content.</summary>
     [Serializable]
     public sealed class ConversationQualityContract
     {
+        /// <summary>Gets the participant-specific quality rules.</summary>
         public List<ConversationParticipantQualityRule> ParticipantRuleList =
             new List<ConversationParticipantQualityRule>();
+        /// <summary>Gets the phrases forbidden by the current scene.</summary>
         public List<string> SceneForbiddenPhraseList = new List<string>();
+        /// <summary>Gets the phrases treated as provider or prompt metadata leakage.</summary>
         public List<string> MetaLeakPhraseList = new List<string>
         {
             "[system]",
@@ -38,8 +54,11 @@ namespace lLCroweTool.LLMConversation
             "시스템 프롬프트",
             "프롬프트 지시"
         };
+        /// <summary>Gets or sets the Jaccard token-similarity threshold from zero to one.</summary>
         public float RepetitionSimilarityThreshold = 0.8f;
 
+        /// <summary>Validates the configurable similarity threshold.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The threshold is outside zero through one.</exception>
         public void Validate()
         {
             if (RepetitionSimilarityThreshold < 0f ||
@@ -49,25 +68,40 @@ namespace lLCroweTool.LLMConversation
         }
     }
 
+    /// <summary>Describes one issue found in generated conversation content.</summary>
     [Serializable]
     public sealed class ConversationQualityIssue
     {
+        /// <summary>Gets or sets the issue category.</summary>
         public ConversationQualityIssueKind Kind;
+        /// <summary>Gets or sets the stable machine-readable issue code.</summary>
         public string Code;
+        /// <summary>Gets or sets the human-readable issue message.</summary>
         public string Message;
+        /// <summary>Gets or sets the phrase that caused the issue, when applicable.</summary>
         public string MatchedPhrase;
     }
 
+    /// <summary>Reports the recommended decision and all detected quality issues.</summary>
     [Serializable]
     public sealed class ConversationQualityResult
     {
+        /// <summary>Gets or sets the recommended consumer decision.</summary>
         public ConversationQualityDecision Decision;
+        /// <summary>Gets the detected issues.</summary>
         public List<ConversationQualityIssue> IssueList =
             new List<ConversationQualityIssue>();
     }
 
+    /// <summary>Evaluates generated content with deterministic provider-neutral checks.</summary>
     public sealed class ConversationQualityEvaluator
     {
+        /// <summary>Evaluates one proposed utterance in the context of its turn.</summary>
+        /// <param name="opportunity">The turn context for the current speaker.</param>
+        /// <param name="content">The proposed spoken content.</param>
+        /// <param name="contract">The quality rules to apply.</param>
+        /// <returns>A quality result that does not mutate the conversation runtime.</returns>
+        /// <exception cref="ArgumentNullException">The opportunity or contract is null.</exception>
         public ConversationQualityResult Evaluate(
             ConversationTurnOpportunity opportunity,
             string content,

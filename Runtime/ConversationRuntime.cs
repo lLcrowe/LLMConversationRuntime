@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace lLCroweTool.LLMConversation
 {
+    /// <summary>
+    /// Owns in-memory conversation sessions and deterministically validates their turn lifecycle.
+    /// </summary>
     public sealed class ConversationRuntime
     {
         private sealed class SessionState
@@ -30,14 +33,26 @@ namespace lLCroweTool.LLMConversation
             new Dictionary<string, SessionState>(StringComparer.Ordinal);
         private readonly Func<long> nowUnixMs;
 
+        /// <summary>Occurs after a detached copy of a new session event has been recorded.</summary>
         public event Action<ConversationEvent> OnEventRecorded;
 
+        /// <summary>Creates an empty runtime.</summary>
+        /// <param name="nowUnixMs">An optional clock used to timestamp events in milliseconds.</param>
         public ConversationRuntime(Func<long> nowUnixMs = null)
         {
             this.nowUnixMs = nowUnixMs ??
                 (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
 
+        /// <summary>Creates and starts a conversation session.</summary>
+        /// <param name="participantList">At least two participants with unique IDs and display names.</param>
+        /// <param name="mode">The conversation mode.</param>
+        /// <param name="scene">The required contract for scene-guided mode.</param>
+        /// <param name="policy">An optional policy; default values are used when null.</param>
+        /// <param name="initialParticipantId">An optional participant that owns the first turn.</param>
+        /// <returns>A detached snapshot of the created session.</returns>
+        /// <exception cref="ArgumentException">Participant or scene requirements are not satisfied.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">A policy value is invalid.</exception>
         public ConversationSnapshot CreateSession(
             IReadOnlyList<ConversationParticipant> participantList,
             ConversationMode mode = ConversationMode.Autonomous,
@@ -80,11 +95,19 @@ namespace lLCroweTool.LLMConversation
             return BuildSnapshot(state);
         }
 
+        /// <summary>Returns a detached snapshot of an existing session.</summary>
+        /// <param name="sessionId">The session identifier.</param>
+        /// <returns>The current session snapshot.</returns>
+        /// <exception cref="ArgumentException">The session does not exist.</exception>
         public ConversationSnapshot GetSnapshot(string sessionId)
         {
             return BuildSnapshot(RequireSession(sessionId));
         }
 
+        /// <summary>Projects the bounded context for the participant that owns the next turn.</summary>
+        /// <param name="sessionId">The session identifier.</param>
+        /// <returns>The current opportunity, or null when the session is paused or completed.</returns>
+        /// <exception cref="ArgumentException">The session does not exist.</exception>
         public ConversationTurnOpportunity GetTurnOpportunity(string sessionId)
         {
             SessionState state = RequireSession(sessionId);
@@ -136,6 +159,9 @@ namespace lLCroweTool.LLMConversation
             return opportunity;
         }
 
+        /// <summary>Validates, records, and applies one participant action.</summary>
+        /// <param name="action">The action submitted by the current participant.</param>
+        /// <returns>A stable result code, recorded event when applicable, and current snapshot.</returns>
         public ConversationOperationResult SubmitAction(ConversationAction action)
         {
             if (action == null || string.IsNullOrWhiteSpace(action.SessionId))
@@ -185,6 +211,10 @@ namespace lLCroweTool.LLMConversation
             return Success(code, "The action was recorded.", state, recordedEvent);
         }
 
+        /// <summary>Pauses an active session.</summary>
+        /// <param name="sessionId">The session identifier.</param>
+        /// <returns>The lifecycle operation result.</returns>
+        /// <exception cref="ArgumentException">The session does not exist.</exception>
         public ConversationOperationResult Pause(string sessionId)
         {
             SessionState state = RequireSession(sessionId);
@@ -199,6 +229,10 @@ namespace lLCroweTool.LLMConversation
             return Success("paused", "The conversation was paused.", state, recordedEvent);
         }
 
+        /// <summary>Resumes a paused session.</summary>
+        /// <param name="sessionId">The session identifier.</param>
+        /// <returns>The lifecycle operation result.</returns>
+        /// <exception cref="ArgumentException">The session does not exist.</exception>
         public ConversationOperationResult Resume(string sessionId)
         {
             SessionState state = RequireSession(sessionId);
@@ -213,6 +247,11 @@ namespace lLCroweTool.LLMConversation
             return Success("resumed", "The conversation resumed.", state, recordedEvent);
         }
 
+        /// <summary>Completes a session with a host-owned reason code.</summary>
+        /// <param name="sessionId">The session identifier.</param>
+        /// <param name="reason">The terminal reason code.</param>
+        /// <returns>The lifecycle operation result.</returns>
+        /// <exception cref="ArgumentException">The session does not exist.</exception>
         public ConversationOperationResult Stop(
             string sessionId,
             string reason = "stopped_by_host")
@@ -228,6 +267,11 @@ namespace lLCroweTool.LLMConversation
                 state.EventList[state.EventList.Count - 1]);
         }
 
+        /// <summary>Removes an active participant independently of turn ownership.</summary>
+        /// <param name="sessionId">The session identifier.</param>
+        /// <param name="participantId">The active participant to remove.</param>
+        /// <returns>The operation result and resulting snapshot.</returns>
+        /// <exception cref="ArgumentException">The session does not exist.</exception>
         public ConversationOperationResult LeaveParticipant(
             string sessionId,
             string participantId)
@@ -268,6 +312,9 @@ namespace lLCroweTool.LLMConversation
             SessionState state,
             ConversationAction action)
         {
+            if (!Enum.IsDefined(typeof(ConversationActionKind), action.Kind))
+                return Failure("invalid_action_kind", "The action kind is not supported.", state);
+
             if (action.Kind == ConversationActionKind.Speak &&
                 string.IsNullOrWhiteSpace(action.Content))
                 return Failure("blank_utterance", "Speak requires non-empty content.", state);
